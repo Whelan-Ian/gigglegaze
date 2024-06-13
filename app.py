@@ -1,10 +1,10 @@
-import os
 from flask import Flask, request, jsonify, render_template
 import boto3
 import requests
 import logging
 import traceback
 import time
+import os
 
 app = Flask(__name__)
 
@@ -17,11 +17,11 @@ s3 = boto3.client('s3', region_name='us-east-1')
 BUCKET_NAME = 'projectappaws'  # Your actual S3 bucket name
 
 # OpenAI Configuration
-OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')  # Use environment variable for API key
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 if not OPENAI_API_KEY:
     raise ValueError("No OpenAI API key found. Please set the OPENAI_API_KEY environment variable.")
-OPENAI_API_KEY = OPENAI_API_KEY.strip()  # Remove any leading/trailing whitespace
-OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions'  # Update the URL to use chat completion
+OPENAI_API_KEY = OPENAI_API_KEY.strip()
+OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions'
 
 # Rate limiting variables
 last_request_time = 0
@@ -29,37 +29,27 @@ REQUEST_INTERVAL = 1  # Minimum interval between requests in seconds
 
 @app.route('/')
 def index():
-    return render_template('index.html')  # Render the index.html template
+    return render_template('index.html')
 
 @app.route('/upload', methods=['POST'])
 def upload_image():
     global last_request_time
     try:
-        # Get the current time
         current_time = time.time()
-
-        # Check if the last request was made within the interval
         if current_time - last_request_time < REQUEST_INTERVAL:
             time.sleep(REQUEST_INTERVAL - (current_time - last_request_time))
-
-        # Update the last request time
         last_request_time = time.time()
 
-        # Get the file from the request
         file = request.files['image']
         if not file:
             return jsonify({'error': 'No file provided'}), 400
 
-        # Upload the file to S3
         file_name = f"images/{file.filename}"
         s3.upload_fileobj(file, BUCKET_NAME, file_name)
-
-        # Generate a pre-signed URL for the uploaded image
         image_url = s3.generate_presigned_url('get_object',
                                               Params={'Bucket': BUCKET_NAME, 'Key': file_name},
                                               ExpiresIn=3600)
 
-        # Analyze the image using Rekognition to detect text
         response = rekognition.detect_text(
             Image={'S3Object': {'Bucket': BUCKET_NAME, 'Name': file_name}}
         )
@@ -67,27 +57,23 @@ def upload_image():
         if 'TextDetections' not in response or not response['TextDetections']:
             return jsonify({'error': 'No text detected'}), 400
 
-        # Create a description based on detected text
         detected_texts = [text['DetectedText'] for text in response['TextDetections']]
         description = " ".join(detected_texts)
 
-        # Generate a funny response using OpenAI
         headers = {
             'Authorization': f'Bearer {OPENAI_API_KEY}',
             'Content-Type': 'application/json'
         }
         data = {
-            'model': 'gpt-3.5-turbo',  # Ensure the model parameter is included
+            'model': 'gpt-3.5-turbo',
             'messages': [
-                {'role': 'system', 'content': 'You are a dark witted assiant.'},
+                {'role': 'system', 'content': 'You are a humorous assistant.'},
                 {'role': 'user', 'content': f"Generate a very witty dirty minded response based on the following detected text: {description}"}
             ],
             'max_tokens': 50,
             'temperature': 0.7
         }
         openai_response = requests.post(OPENAI_API_URL, headers=headers, json=data)
-
-        # Log the OpenAI response for debugging
         app.logger.debug(f"OpenAI response status code: {openai_response.status_code}")
         app.logger.debug(f"OpenAI response content: {openai_response.text}")
 
@@ -98,8 +84,7 @@ def upload_image():
             return jsonify({'error': 'Failed to get response from OpenAI'}), 500
 
         funny_response = openai_response.json()['choices'][0]['message']['content'].strip()
-
-        return jsonify({'description': description, 'funny_response': funny_response})
+        return jsonify({'funny_response': funny_response})
 
     except Exception as e:
         app.logger.error(f"Error: {str(e)}")
@@ -108,4 +93,3 @@ def upload_image():
 
 if __name__ == '__main__':
     app.run(debug=True)
-
