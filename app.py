@@ -1,4 +1,5 @@
-from flask import Flask, request, jsonify, render_template, send_from_directory
+import os
+from flask import Flask, request, jsonify, render_template
 import boto3
 import requests
 import logging
@@ -16,7 +17,10 @@ s3 = boto3.client('s3', region_name='us-east-1')
 BUCKET_NAME = 'projectappaws'  # Your actual S3 bucket name
 
 # OpenAI Configuration
-OPENAI_API_KEY = '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'  # Update with your new OpenAI API key
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')  # Use environment variable for API key
+if not OPENAI_API_KEY:
+    raise ValueError("No OpenAI API key found. Please set the OPENAI_API_KEY environment variable.")
+OPENAI_API_KEY = OPENAI_API_KEY.strip()  # Remove any leading/trailing whitespace
 OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions'  # Update the URL to use chat completion
 
 # Rate limiting variables
@@ -75,8 +79,8 @@ def upload_image():
         data = {
             'model': 'gpt-3.5-turbo',  # Ensure the model parameter is included
             'messages': [
-                {'role': 'system', 'content': 'You are a humorous assistant.'},
-                {'role': 'user', 'content': f"Generate a funny response based on the following detected text: {description}"}
+                {'role': 'system', 'content': 'You are a dark witted assiant.'},
+                {'role': 'user', 'content': f"Generate a very witty dirty minded response based on the following detected text: {description}"}
             ],
             'max_tokens': 50,
             'temperature': 0.7
@@ -95,7 +99,7 @@ def upload_image():
 
         funny_response = openai_response.json()['choices'][0]['message']['content'].strip()
 
-        return jsonify({'description': description, 'funny_response': funny_response, 'image_url': image_url})
+        return jsonify({'description': description, 'funny_response': funny_response})
 
     except Exception as e:
         app.logger.error(f"Error: {str(e)}")
@@ -104,3 +108,4 @@ def upload_image():
 
 if __name__ == '__main__':
     app.run(debug=True)
+
