@@ -30,6 +30,6 @@ Follow these steps to set up the project on your local machine:
    git clone https://github.com/Whelan-Ian/gigglegaze.git
    cd gigglegaze
 2. **setup environemnt:**
-```sh
-python3 -m venv env
-source env/bin/activate  
+   ```sh
+   python3 -m venv env
+   source env/bin/activate  
